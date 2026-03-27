@@ -1,0 +1,36 @@
+{
+  "name": "datto-rmm-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP Server for Datto RMM — all API tools with Copilot Studio compatible schemas",
+  "main": "build/index.js",
+  "bin": {
+    "datto-rmm-mcp-server": "build/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepare": "tsc",
+    "start": "node build/index.js",
+    "dev": "tsc --watch",
+    "inspect": "npx @modelcontextprotocol/inspector node build/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "files": [
+    "build/"
+  ],
+  "keywords": [
+    "mcp",
+    "datto",
+    "rmm",
+    "copilot-studio"
+  ],
+  "license": "MIT"
+}
