@@ -1,6 +1,7 @@
 # Datto RMM MCP Server
 
-[![npm version](https://img.shields.io/npm/v/@veeemlab/datto-rmm-mcp.svg)](https://www.npmjs.com/package/@veeemlab/datto-rmm-mcp)
+[![npm version](https://img.shields.io/npm/v/@veeemlab/datto-rmm-mcp?color=blue&label=npm)](https://www.npmjs.com/package/@veeemlab/datto-rmm-mcp)
+[![npm downloads](https://img.shields.io/npm/dm/@veeemlab/datto-rmm-mcp?color=blue)](https://www.npmjs.com/package/@veeemlab/datto-rmm-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A Model Context Protocol (MCP) server that provides **55 tools** for the Datto RMM API. All tool schemas are **Copilot Studio compatible** (flat schemas, no `$ref`, no `anyOf`, no nested objects).
