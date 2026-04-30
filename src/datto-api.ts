@@ -9,11 +9,20 @@ const PLATFORMS: Record<string, string> = {
   syrah: 'https://syrah-api.centrastage.net',
 };
 
+const MAX_RETRIES = 3;
+const TOKEN_REFRESH_BUFFER_SECONDS = 300;
+const SAFE_METHODS = new Set(['GET', 'DELETE']);
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export class DattoApi {
   private apiUrl: string;
   private apiKey: string;
   private apiSecret: string;
   private token: TokenData | null = null;
+  private tokenPromise: Promise<string> | null = null;
 
   constructor() {
     this.apiKey = process.env.DATTO_API_KEY || '';
@@ -30,11 +39,21 @@ export class DattoApi {
     if (this.token) {
       const elapsed = (Date.now() - this.token.obtained_at) / 1000;
       const remaining = this.token.expires_in - elapsed;
-      if (remaining > 300) {
+      if (remaining > TOKEN_REFRESH_BUFFER_SECONDS) {
         return this.token.access_token;
       }
     }
 
+    // Singleton in-flight token request: concurrent callers share one fetch.
+    if (this.tokenPromise) return this.tokenPromise;
+
+    this.tokenPromise = this.fetchNewToken().finally(() => {
+      this.tokenPromise = null;
+    });
+    return this.tokenPromise;
+  }
+
+  private async fetchNewToken(): Promise<string> {
     const auth = Buffer.from('public-client:public').toString('base64');
     const resp = await fetch(`${this.apiUrl}/auth/oauth/token`, {
       method: 'POST',
@@ -56,40 +75,65 @@ export class DattoApi {
       expires_in: data.expires_in,
       obtained_at: Date.now(),
     };
-
     return this.token.access_token;
   }
 
   async apiCall(method: string, path: string, body?: unknown): Promise<unknown> {
-    const token = await this.getToken();
     const url = `${this.apiUrl}/api${path}`;
+    const isSafeMethod = SAFE_METHODS.has(method);
+    let auth401Retried = false;
+    let attempt = 0;
 
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    };
+    while (true) {
+      const token = await this.getToken();
+      const options: RequestInit = {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      };
+      if (body !== undefined) {
+        options.body = JSON.stringify(body);
+      }
 
-    const options: RequestInit = { method, headers };
-    if (body !== undefined) {
-      options.body = JSON.stringify(body);
-    }
+      const resp = await fetch(url, options);
 
-    const resp = await fetch(url, options);
+      if (resp.status === 204) return { success: true };
+      if (resp.ok) {
+        const text = await resp.text();
+        return text ? JSON.parse(text) : { success: true };
+      }
 
-    if (resp.status === 204) {
-      return { success: true };
-    }
+      // 401: invalidate token and retry once (any method — server hasn't acted).
+      if (resp.status === 401 && !auth401Retried) {
+        this.token = null;
+        auth401Retried = true;
+        continue;
+      }
 
-    const text = await resp.text();
-    if (!resp.ok) {
+      // 429: respect Retry-After, retry any method up to MAX_RETRIES times.
+      if (resp.status === 429 && attempt < MAX_RETRIES) {
+        const retryAfter = resp.headers.get('Retry-After');
+        const delayMs = retryAfter
+          ? Math.max(0, parseInt(retryAfter, 10) * 1000)
+          : 1000 * Math.pow(2, attempt);
+        await sleep(delayMs);
+        attempt++;
+        continue;
+      }
+
+      // 5xx: only safe methods. Exponential backoff with full jitter.
+      if (resp.status >= 500 && resp.status < 600 && isSafeMethod && attempt < MAX_RETRIES) {
+        const delayMs = Math.random() * 1000 * Math.pow(2, attempt);
+        await sleep(delayMs);
+        attempt++;
+        continue;
+      }
+
+      const text = await resp.text();
       throw new Error(`API error (${resp.status}): ${text}`);
     }
-
-    if (!text) {
-      return { success: true };
-    }
-
-    return JSON.parse(text);
   }
 
   // Account
