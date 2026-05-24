@@ -11,7 +11,11 @@ const PLATFORMS: Record<string, string> = {
 
 const MAX_RETRIES = 3;
 const TOKEN_REFRESH_BUFFER_SECONDS = 300;
-const SAFE_METHODS = new Set(['GET', 'DELETE']);
+// Methods that may be retried on 5xx. DELETE is included because Datto's
+// DELETE endpoints are idempotent — a repeat call on an already-removed
+// resource returns 404 instead of corrupting state. (DELETE is *not* safe
+// per RFC 9110, but it is idempotent, which is what retry semantics need.)
+const IDEMPOTENT_METHODS = new Set(['GET', 'DELETE']);
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -103,7 +107,7 @@ export class DattoApi {
 
   async apiCall(method: string, path: string, body?: unknown): Promise<unknown> {
     const url = `${this.apiUrl}/api${path}`;
-    const isSafeMethod = SAFE_METHODS.has(method);
+    const isIdempotent = IDEMPOTENT_METHODS.has(method);
     let auth401Retried = false;
     let attempt = 0;
 
@@ -147,7 +151,7 @@ export class DattoApi {
       }
 
       // 5xx: only safe methods. Exponential backoff with full jitter.
-      if (resp.status >= 500 && resp.status < 600 && isSafeMethod && attempt < MAX_RETRIES) {
+      if (resp.status >= 500 && resp.status < 600 && isIdempotent && attempt < MAX_RETRIES) {
         const delayMs = Math.random() * 1000 * Math.pow(2, attempt);
         await sleep(delayMs);
         attempt++;

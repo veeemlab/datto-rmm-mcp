@@ -1,6 +1,6 @@
 {
   "name": "@veeemlab/datto-rmm-mcp",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Datto RMM MCP server with 55 tools covering the full Datto RMM API v2. Copilot Studio compatible flat schemas, multi-platform OAuth2.",
   "type": "module",
   "main": "dist/index.js",
