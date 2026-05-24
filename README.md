@@ -10,7 +10,7 @@ A Model Context Protocol (MCP) server that provides **55 tools** for the Datto R
 ## Features
 
 - **55 Tools** covering the complete Datto RMM API v2
-- **6 MCP Resources** (account, sites, alerts, site details, site devices, device)
+- **5 MCP Resources** (account, sites, site details, site devices, device)
 - **Copilot Studio compatible** — flat input schemas (`string` / `integer` only)
 - **STDIO transport** — works with Claude Desktop, MetaMCP, and any MCP client
 - **OAuth2 token management** with automatic refresh
@@ -192,7 +192,7 @@ npx @modelcontextprotocol/inspector npx -y @veeemlab/datto-rmm-mcp
 | `list-default-filters`  | List default device filters  |
 | `list-custom-filters`   | List custom device filters   |
 
-## Resources (6)
+## Resources (5)
 
 | URI                               | Description                                               |
 | --------------------------------- | --------------------------------------------------------- |

@@ -17,6 +17,23 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const REDACT_PLACEHOLDER = '[REDACTED]';
+const ERROR_BODY_MAX_LEN = 500;
+
+export function redactSecrets(text: string): string {
+  if (!text) return text;
+  let out = text
+    .replace(/Bearer\s+[A-Za-z0-9._\-+/=]+/gi, `Bearer ${REDACT_PLACEHOLDER}`)
+    .replace(
+      /("?(?:api[_-]?key|api[_-]?secret|password|secret|token|access[_-]?token|refresh[_-]?token|authorization|proxy[_-]?password)"?\s*[:=]\s*"?)([^"\s,}]+)/gi,
+      `$1${REDACT_PLACEHOLDER}`,
+    );
+  if (out.length > ERROR_BODY_MAX_LEN) {
+    out = out.slice(0, ERROR_BODY_MAX_LEN) + '…[truncated]';
+  }
+  return out;
+}
+
 export class DattoApi {
   private apiUrl: string;
   private apiKey: string;
@@ -27,12 +44,18 @@ export class DattoApi {
   constructor() {
     this.apiKey = process.env.DATTO_API_KEY || '';
     this.apiSecret = process.env.DATTO_API_SECRET || '';
-    const platform = (process.env.DATTO_PLATFORM || 'merlot').toLowerCase();
-    this.apiUrl = PLATFORMS[platform] || PLATFORMS['merlot'];
 
     if (!this.apiKey || !this.apiSecret) {
-      console.error('WARNING: DATTO_API_KEY and DATTO_API_SECRET must be set');
+      throw new Error('DATTO_API_KEY and DATTO_API_SECRET environment variables are required');
     }
+
+    const platform = (process.env.DATTO_PLATFORM || 'merlot').toLowerCase();
+    if (!Object.prototype.hasOwnProperty.call(PLATFORMS, platform)) {
+      throw new Error(
+        `Invalid DATTO_PLATFORM: "${platform}". Valid platforms: ${Object.keys(PLATFORMS).join(', ')}`,
+      );
+    }
+    this.apiUrl = PLATFORMS[platform];
   }
 
   private async getToken(): Promise<string> {
@@ -132,7 +155,7 @@ export class DattoApi {
       }
 
       const text = await resp.text();
-      throw new Error(`API error (${resp.status}): ${text}`);
+      throw new Error(`API error (${resp.status}): ${redactSecrets(text)}`);
     }
   }
 

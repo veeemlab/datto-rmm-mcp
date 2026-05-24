@@ -108,19 +108,17 @@ describe('DattoApi.apiCall', () => {
     expect(apiCallUrl).toBe('https://pinotage-api.centrastage.net/api/v2/account');
   });
 
-  it('falls back to merlot for unknown platform', async () => {
+  it('throws fast for unknown DATTO_PLATFORM', async () => {
     process.env.DATTO_PLATFORM = 'nonexistent';
-    const fetchMock = mockFetchSequence([
-      { status: 200, body: { access_token: 'tok', expires_in: 3600 } },
-      { status: 200, body: {} },
-    ]);
+    await expect(importFreshApi()).rejects.toThrow(/Invalid DATTO_PLATFORM: "nonexistent"/);
+  });
 
-    const { DattoApi } = await importFreshApi();
-    const api = new DattoApi();
-    await api.apiCall('GET', '/v2/account');
-
-    const apiCallUrl = fetchMock.mock.calls[1][0];
-    expect(apiCallUrl).toMatch(/^https:\/\/merlot-api\.centrastage\.net\//);
+  it('throws fast when DATTO_API_KEY or DATTO_API_SECRET missing', async () => {
+    delete process.env.DATTO_API_KEY;
+    delete process.env.DATTO_API_SECRET;
+    await expect(importFreshApi()).rejects.toThrow(
+      /DATTO_API_KEY and DATTO_API_SECRET environment variables are required/,
+    );
   });
 
   it('returns success object on 204 No Content', async () => {
@@ -160,6 +158,44 @@ describe('DattoApi.apiCall', () => {
     const { DattoApi } = await importFreshApi();
     const api = new DattoApi();
     await expect(api.apiCall('GET', '/v2/site/missing')).rejects.toThrow(/API error \(404\)/);
+  });
+
+  it('redacts bearer tokens and secret fields in error bodies', async () => {
+    mockFetchSequence([
+      { status: 200, body: { access_token: 'tok', expires_in: 3600 } },
+      {
+        status: 400,
+        body: 'failed call Bearer abc.def.ghi api_key=SECRETVAL password="hunter2"',
+      },
+    ]);
+
+    const { DattoApi } = await importFreshApi();
+    const api = new DattoApi();
+    let caught: unknown;
+    try {
+      await api.apiCall('GET', '/v2/account');
+    } catch (e) {
+      caught = e;
+    }
+    const msg = (caught as Error).message;
+    expect(msg).toContain('Bearer [REDACTED]');
+    expect(msg).toContain('api_key=[REDACTED]');
+    expect(msg).toContain('password="[REDACTED]');
+    expect(msg).not.toContain('SECRETVAL');
+    expect(msg).not.toContain('abc.def.ghi');
+    expect(msg).not.toContain('hunter2');
+  });
+
+  it('truncates oversized error bodies', async () => {
+    const huge = 'x'.repeat(1000);
+    mockFetchSequence([
+      { status: 200, body: { access_token: 'tok', expires_in: 3600 } },
+      { status: 400, body: huge },
+    ]);
+
+    const { DattoApi } = await importFreshApi();
+    const api = new DattoApi();
+    await expect(api.apiCall('GET', '/v2/account')).rejects.toThrow(/…\[truncated\]/);
   });
 });
 

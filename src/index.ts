@@ -1,14 +1,21 @@
 #!/usr/bin/env node
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { allTools } from './tools/index.js';
 import { staticResources, resourceTemplates, handleResource } from './resources.js';
 
+const pkg = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf-8'),
+) as { version: string };
+
 const server = new McpServer({
   name: 'datto-rmm-mcp-server',
-  version: '1.0.0',
+  version: pkg.version,
 });
 
 for (const tool of allTools) {
@@ -17,17 +24,10 @@ for (const tool of allTools) {
   const required = tool.inputSchema.required || [];
 
   for (const [key, prop] of Object.entries(props)) {
-    let zodType: z.ZodTypeAny;
-    if (prop.type === 'integer') {
-      zodType = z.string().describe(prop.description);
-    } else {
-      zodType = z.string().describe(prop.description);
-    }
-
+    let zodType: z.ZodTypeAny = z.string().describe(prop.description);
     if (!required.includes(key)) {
       zodType = zodType.optional();
     }
-
     shape[key] = zodType;
   }
 
