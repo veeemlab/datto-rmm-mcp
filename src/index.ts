@@ -8,6 +8,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { allTools } from './tools/index.js';
 import { staticResources, resourceTemplates, handleResource } from './resources.js';
+import { DESTRUCTIVE_TOOLS, confirmTokenFor, isReadonly } from './security.js';
 
 const pkg = JSON.parse(
   readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf-8'),
@@ -18,10 +19,30 @@ const server = new McpServer({
   version: pkg.version,
 });
 
+const readonly = isReadonly();
+let registeredCount = 0;
+let skippedDestructive = 0;
+
 for (const tool of allTools) {
+  const isDestructive = DESTRUCTIVE_TOOLS.has(tool.name);
+  if (readonly && isDestructive) {
+    skippedDestructive++;
+    continue;
+  }
+
+  const confirmToken = isDestructive ? confirmTokenFor(tool.name) : null;
+
   const shape: Record<string, z.ZodTypeAny> = {};
   const props = tool.inputSchema.properties;
   const required = tool.inputSchema.required || [];
+
+  if (confirmToken) {
+    shape.confirm = z
+      .string()
+      .describe(
+        `Required confirmation token. Must equal "${confirmToken}" to authorize this destructive action.`,
+      );
+  }
 
   for (const [key, prop] of Object.entries(props)) {
     let zodType: z.ZodTypeAny = z.string().describe(prop.description);
@@ -37,6 +58,19 @@ for (const tool of allTools) {
       for (const [k, v] of Object.entries(args)) {
         if (v !== undefined) stringArgs[k] = String(v);
       }
+
+      if (confirmToken) {
+        const given = stringArgs.confirm;
+        if (given !== confirmToken) {
+          throw new Error(
+            `Destructive tool "${tool.name}" requires confirm: "${confirmToken}" (got: ${
+              given ? `"${given}"` : 'missing'
+            })`,
+          );
+        }
+        delete stringArgs.confirm;
+      }
+
       const result = await tool.handler(stringArgs);
       return { ...result } as {
         content: Array<{ type: 'text'; text: string }>;
@@ -52,6 +86,8 @@ for (const tool of allTools) {
       };
     }
   });
+
+  registeredCount++;
 }
 
 // Register static resources
@@ -83,7 +119,10 @@ for (const tpl of resourceTemplates) {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error(`Datto RMM MCP Server running (${allTools.length} tools registered)`);
+  const modeLabel = readonly ? 'READONLY' : 'full';
+  console.error(
+    `Datto RMM MCP Server running (mode: ${modeLabel}, ${registeredCount} tools registered, ${skippedDestructive} destructive skipped)`,
+  );
 }
 
 main().catch((err) => {

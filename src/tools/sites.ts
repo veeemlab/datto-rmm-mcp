@@ -1,5 +1,6 @@
 import { ToolDefinition } from '../types.js';
 import { api } from '../datto-api.js';
+import { parseJsonBody, createSiteSchema, updateSiteSchema, proxyDataSchema } from '../security.js';
 
 function buildQuery(args: Record<string, string>, keys: string[]): string {
   const params = new URLSearchParams();
@@ -42,7 +43,7 @@ export const siteTools: ToolDefinition[] = [
       required: ['siteData'],
     },
     handler: async (args) => {
-      const body = JSON.parse(args.siteData);
+      const body = parseJsonBody(args.siteData, createSiteSchema, 'siteData');
       const result = await api.createSite(body);
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     },
@@ -63,7 +64,7 @@ export const siteTools: ToolDefinition[] = [
       required: ['siteUid', 'siteData'],
     },
     handler: async (args) => {
-      const body = JSON.parse(args.siteData);
+      const body = parseJsonBody(args.siteData, updateSiteSchema, 'siteData');
       const result = await api.updateSite(args.siteUid, body);
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     },
@@ -175,7 +176,7 @@ export const siteTools: ToolDefinition[] = [
       required: ['siteUid', 'proxyData'],
     },
     handler: async (args) => {
-      const body = JSON.parse(args.proxyData);
+      const body = parseJsonBody(args.proxyData, proxyDataSchema, 'proxyData');
       const result = await api.setSiteProxy(args.siteUid, body);
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     },

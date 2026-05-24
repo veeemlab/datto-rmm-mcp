@@ -1,5 +1,6 @@
 import { ToolDefinition } from '../types.js';
 import { api } from '../datto-api.js';
+import { parseJsonBody, jobDataSchema, udfDataSchema } from '../security.js';
 
 function buildQuery(args: Record<string, string>, keys: string[]): string {
   const params = new URLSearchParams();
@@ -130,7 +131,7 @@ export const deviceTools: ToolDefinition[] = [
       required: ['deviceUid', 'jobData'],
     },
     handler: async (args) => {
-      const body = JSON.parse(args.jobData);
+      const body = parseJsonBody(args.jobData, jobDataSchema, 'jobData');
       const result = await api.createQuickJob(args.deviceUid, body);
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     },
@@ -152,7 +153,7 @@ export const deviceTools: ToolDefinition[] = [
       required: ['deviceUid', 'udfData'],
     },
     handler: async (args) => {
-      const body = JSON.parse(args.udfData);
+      const body = parseJsonBody(args.udfData, udfDataSchema, 'udfData');
       const result = await api.setDeviceUdf(args.deviceUid, body);
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     },

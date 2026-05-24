@@ -82,11 +82,33 @@ npx @modelcontextprotocol/inspector npx -y @veeemlab/datto-rmm-mcp
 
 ## Environment Variables
 
-| Variable           | Required | Default  | Description                                                              |
-| ------------------ | -------- | -------- | ------------------------------------------------------------------------ |
-| `DATTO_API_KEY`    | Yes      | —        | Datto RMM API Key                                                        |
-| `DATTO_API_SECRET` | Yes      | —        | Datto RMM API Secret                                                     |
-| `DATTO_PLATFORM`   | No       | `merlot` | Platform: `pinotage`, `merlot`, `concord`, `vidal`, `zinfandel`, `syrah` |
+| Variable             | Required | Default  | Description                                                                                         |
+| -------------------- | -------- | -------- | --------------------------------------------------------------------------------------------------- |
+| `DATTO_API_KEY`      | Yes      | —        | Datto RMM API Key                                                                                   |
+| `DATTO_API_SECRET`   | Yes      | —        | Datto RMM API Secret                                                                                |
+| `DATTO_PLATFORM`     | No       | `merlot` | Platform: `pinotage`, `merlot`, `concord`, `vidal`, `zinfandel`, `syrah`. Invalid value fails fast. |
+| `DATTO_MCP_READONLY` | No       | `false`  | When `true`, skips registration of all 10 destructive tools (see below).                            |
+
+## Safety: Destructive Tools
+
+Ten tools mutate state in Datto RMM. They are registered by default but each call requires a `confirm` argument with an exact uppercase token equal to the tool name (kebab → snake). Example: `reset-api-keys` requires `confirm: "RESET_API_KEYS"`. Wrong or missing token → call rejected without hitting the Datto API.
+
+Set `DATTO_MCP_READONLY=true` to skip registration entirely (recommended when the LLM does not need write access).
+
+Destructive tools (with required confirm tokens):
+
+| Tool                      | Confirm token             |
+| ------------------------- | ------------------------- |
+| `reset-api-keys`          | `RESET_API_KEYS`          |
+| `create-quick-job`        | `CREATE_QUICK_JOB`        |
+| `move-device`             | `MOVE_DEVICE`             |
+| `resolve-alert`           | `RESOLVE_ALERT`           |
+| `delete-account-variable` | `DELETE_ACCOUNT_VARIABLE` |
+| `delete-site-variable`    | `DELETE_SITE_VARIABLE`    |
+| `delete-site-proxy`       | `DELETE_SITE_PROXY`       |
+| `set-site-proxy`          | `SET_SITE_PROXY`          |
+| `set-device-udf`          | `SET_DEVICE_UDF`          |
+| `set-device-warranty`     | `SET_DEVICE_WARRANTY`     |
 
 ## Datto API Setup
 
