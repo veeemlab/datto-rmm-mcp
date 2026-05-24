@@ -12,7 +12,7 @@ A Model Context Protocol (MCP) server that provides **55 tools** for the Datto R
 - **55 Tools** covering the complete Datto RMM API v2
 - **5 MCP Resources** (account, sites, site details, site devices, device)
 - **Copilot Studio compatible** — flat input schemas (`string` / `integer` only)
-- **STDIO transport** — works with Claude Desktop, MetaMCP, and any MCP client
+- **STDIO transport** — works with Claude Desktop and any MCP-compatible client
 - **OAuth2 token management** with automatic refresh
 - **All 6 Datto RMM platforms** supported
 
@@ -59,20 +59,15 @@ Add to your `claude_desktop_config.json`:
       "env": {
         "DATTO_API_KEY": "your-api-key",
         "DATTO_API_SECRET": "your-api-secret",
-        "DATTO_PLATFORM": "merlot"
+        "DATTO_PLATFORM": "merlot",
+        "DATTO_MCP_READONLY": "false"
       }
     }
   }
 }
 ```
 
-## MetaMCP Setup
-
-```
-Command:   npx
-Arguments: -y @veeemlab/datto-rmm-mcp
-Env:       DATTO_API_KEY=..., DATTO_API_SECRET=..., DATTO_PLATFORM=merlot
-```
+Set `"DATTO_MCP_READONLY": "true"` to expose only the 39 read-only tools (recommended for LLMs that should never write to Datto).
 
 ## MCP Inspector
 
@@ -87,15 +82,27 @@ npx @modelcontextprotocol/inspector npx -y @veeemlab/datto-rmm-mcp
 | `DATTO_API_KEY`      | Yes      | —        | Datto RMM API Key                                                                                   |
 | `DATTO_API_SECRET`   | Yes      | —        | Datto RMM API Secret                                                                                |
 | `DATTO_PLATFORM`     | No       | `merlot` | Platform: `pinotage`, `merlot`, `concord`, `vidal`, `zinfandel`, `syrah`. Invalid value fails fast. |
-| `DATTO_MCP_READONLY` | No       | `false`  | When `true`, skips registration of all 10 destructive tools (see below).                            |
+| `DATTO_MCP_READONLY` | No       | `false`  | When `true` (case-insensitive), skips registration of all 16 destructive tools (see below).         |
 
-## Safety: Destructive Tools
+## Safety Model
 
-Ten tools mutate state in Datto RMM. They are registered by default but each call requires a `confirm` argument with an exact uppercase token equal to the tool name (kebab → snake). Example: `reset-api-keys` requires `confirm: "RESET_API_KEYS"`. Wrong or missing token → call rejected without hitting the Datto API.
+The server has two independent safety layers on top of any MCP hub allowlist.
 
-Set `DATTO_MCP_READONLY=true` to skip registration entirely (recommended when the LLM does not need write access).
+### Layer 1 — Readonly mode (env-gated, skips registration)
 
-Destructive tools (with required confirm tokens):
+Set `DATTO_MCP_READONLY=true` (any casing accepted: `TRUE`, `True`, `true`) and the server registers only the 39 read-only tools. The 16 destructive tools listed below are not exposed at all. Recommended for LLMs that should never write to Datto RMM.
+
+### Layer 2 — Confirm tokens (per-call, for high-risk subset)
+
+A subset of 10 high-risk tools always requires an extra `confirm` argument with an exact uppercase-snake token equal to the tool name. Example: `reset-api-keys` requires `confirm: "RESET_API_KEYS"`. Wrong or missing token → call rejected before any Datto API request. This layer is active even with `DATTO_MCP_READONLY=false`.
+
+### Tool taxonomy
+
+**Destructive (16 — skipped when `DATTO_MCP_READONLY=true`):**
+
+`reset-api-keys`, `create-quick-job`, `move-device`, `resolve-alert`, `delete-account-variable`, `delete-site-variable`, `delete-site-proxy`, `set-site-proxy`, `set-device-udf`, `set-device-warranty`, `create-account-variable`, `update-account-variable`, `create-site`, `update-site`, `create-site-variable`, `update-site-variable`.
+
+**Confirm-required (10 — high-risk subset, need `confirm` token):**
 
 | Tool                      | Confirm token             |
 | ------------------------- | ------------------------- |

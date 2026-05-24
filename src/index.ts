@@ -8,7 +8,12 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { allTools } from './tools/index.js';
 import { staticResources, resourceTemplates, handleResource } from './resources.js';
-import { DESTRUCTIVE_TOOLS, confirmTokenFor, isReadonly } from './security.js';
+import {
+  DESTRUCTIVE_TOOLS,
+  CONFIRM_REQUIRED_TOOLS,
+  confirmTokenFor,
+  isReadonly,
+} from './security.js';
 
 const pkg = JSON.parse(
   readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf-8'),
@@ -25,12 +30,13 @@ let skippedDestructive = 0;
 
 for (const tool of allTools) {
   const isDestructive = DESTRUCTIVE_TOOLS.has(tool.name);
+  const requiresConfirm = CONFIRM_REQUIRED_TOOLS.has(tool.name);
   if (readonly && isDestructive) {
     skippedDestructive++;
     continue;
   }
 
-  const confirmToken = isDestructive ? confirmTokenFor(tool.name) : null;
+  const confirmToken = requiresConfirm ? confirmTokenFor(tool.name) : null;
 
   const shape: Record<string, z.ZodTypeAny> = {};
   const props = tool.inputSchema.properties;

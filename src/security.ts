@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const DESTRUCTIVE_TOOLS: ReadonlySet<string> = new Set([
+export const CONFIRM_REQUIRED_TOOLS: ReadonlySet<string> = new Set([
   'reset-api-keys',
   'create-quick-job',
   'move-device',
@@ -13,12 +13,22 @@ export const DESTRUCTIVE_TOOLS: ReadonlySet<string> = new Set([
   'set-device-warranty',
 ]);
 
+export const DESTRUCTIVE_TOOLS: ReadonlySet<string> = new Set([
+  ...CONFIRM_REQUIRED_TOOLS,
+  'create-account-variable',
+  'update-account-variable',
+  'create-site',
+  'update-site',
+  'create-site-variable',
+  'update-site-variable',
+]);
+
 export function confirmTokenFor(toolName: string): string {
   return toolName.toUpperCase().replace(/-/g, '_');
 }
 
 export function isReadonly(): boolean {
-  return process.env.DATTO_MCP_READONLY === 'true';
+  return (process.env.DATTO_MCP_READONLY || '').toLowerCase() === 'true';
 }
 
 export function parseJsonBody<T>(raw: string, schema: z.ZodType<T>, fieldName: string): T {

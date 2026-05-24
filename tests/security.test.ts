@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
+  CONFIRM_REQUIRED_TOOLS,
   DESTRUCTIVE_TOOLS,
   confirmTokenFor,
   isReadonly,
@@ -17,9 +18,9 @@ afterEach(() => {
   process.env = { ...ORIGINAL_ENV };
 });
 
-describe('DESTRUCTIVE_TOOLS', () => {
-  it('contains exactly the 10 destructive tool names', () => {
-    expect(DESTRUCTIVE_TOOLS.size).toBe(10);
+describe('CONFIRM_REQUIRED_TOOLS', () => {
+  it('contains exactly the 10 high-risk tool names that require a confirm token', () => {
+    expect(CONFIRM_REQUIRED_TOOLS.size).toBe(10);
     for (const name of [
       'reset-api-keys',
       'create-quick-job',
@@ -32,6 +33,38 @@ describe('DESTRUCTIVE_TOOLS', () => {
       'set-device-udf',
       'set-device-warranty',
     ]) {
+      expect(CONFIRM_REQUIRED_TOOLS.has(name)).toBe(true);
+    }
+  });
+});
+
+describe('DESTRUCTIVE_TOOLS', () => {
+  it('contains exactly the 16 destructive tool names (10 confirm-required + 6 plain writes)', () => {
+    expect(DESTRUCTIVE_TOOLS.size).toBe(16);
+    for (const name of [
+      'reset-api-keys',
+      'create-quick-job',
+      'move-device',
+      'resolve-alert',
+      'delete-account-variable',
+      'delete-site-variable',
+      'delete-site-proxy',
+      'set-site-proxy',
+      'set-device-udf',
+      'set-device-warranty',
+      'create-account-variable',
+      'update-account-variable',
+      'create-site',
+      'update-site',
+      'create-site-variable',
+      'update-site-variable',
+    ]) {
+      expect(DESTRUCTIVE_TOOLS.has(name)).toBe(true);
+    }
+  });
+
+  it('is a superset of CONFIRM_REQUIRED_TOOLS', () => {
+    for (const name of CONFIRM_REQUIRED_TOOLS) {
       expect(DESTRUCTIVE_TOOLS.has(name)).toBe(true);
     }
   });
@@ -54,18 +87,18 @@ describe('isReadonly', () => {
     expect(isReadonly()).toBe(false);
   });
 
-  it('returns true only for exact string "true"', () => {
-    process.env.DATTO_MCP_READONLY = 'true';
-    expect(isReadonly()).toBe(true);
+  it('returns true for "true" in any case', () => {
+    for (const v of ['true', 'TRUE', 'True', 'tRuE']) {
+      process.env.DATTO_MCP_READONLY = v;
+      expect(isReadonly()).toBe(true);
+    }
   });
 
-  it('returns false for any other truthy string', () => {
-    process.env.DATTO_MCP_READONLY = '1';
-    expect(isReadonly()).toBe(false);
-    process.env.DATTO_MCP_READONLY = 'TRUE';
-    expect(isReadonly()).toBe(false);
-    process.env.DATTO_MCP_READONLY = 'yes';
-    expect(isReadonly()).toBe(false);
+  it('returns false for any other value', () => {
+    for (const v of ['1', 'yes', 'on', 'false', '']) {
+      process.env.DATTO_MCP_READONLY = v;
+      expect(isReadonly()).toBe(false);
+    }
   });
 });
 

@@ -89,7 +89,7 @@ export class DattoApi {
 
     if (!resp.ok) {
       const text = await resp.text();
-      throw new Error(`Auth failed (${resp.status}): ${text}`);
+      throw new Error(`Auth failed (${resp.status}): ${redactSecrets(text)}`);
     }
 
     const data = (await resp.json()) as { access_token: string; expires_in: number };

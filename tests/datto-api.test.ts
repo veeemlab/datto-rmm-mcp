@@ -160,6 +160,29 @@ describe('DattoApi.apiCall', () => {
     await expect(api.apiCall('GET', '/v2/site/missing')).rejects.toThrow(/API error \(404\)/);
   });
 
+  it('redacts secrets in auth (token endpoint) error bodies', async () => {
+    mockFetchSequence([
+      {
+        status: 401,
+        body: 'access_token=LEAKED_TOKEN; password="hunter2"; api_key=AK123',
+      },
+    ]);
+
+    const { DattoApi } = await importFreshApi();
+    const api = new DattoApi();
+    let caught: unknown;
+    try {
+      await api.apiCall('GET', '/v2/account');
+    } catch (e) {
+      caught = e;
+    }
+    const msg = (caught as Error).message;
+    expect(msg).toContain('Auth failed');
+    expect(msg).not.toContain('LEAKED_TOKEN');
+    expect(msg).not.toContain('hunter2');
+    expect(msg).not.toContain('AK123');
+  });
+
   it('redacts bearer tokens and secret fields in error bodies', async () => {
     mockFetchSequence([
       { status: 200, body: { access_token: 'tok', expires_in: 3600 } },
